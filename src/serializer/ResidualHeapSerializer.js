@@ -1915,7 +1915,7 @@ export class ResidualHeapSerializer {
   // PropertyBindings -- visit any property bindings that aren't to createdobjects
   // CreatedObjects -- should take care of itself
   _serializeAdditionalFunction(additionalFunctionValue: FunctionValue, additionalEffects: AdditionalFunctionEffects) {
-    let { effects, transforms, generator } = additionalEffects;
+    let { effects, transforms, generator, additionalRoots } = additionalEffects;
     // No function info means the function is dead code, also break recursive cycles where we've already started
     // serializing this value
     if (
@@ -1925,6 +1925,12 @@ export class ResidualHeapSerializer {
       return;
     }
     this.rewrittenAdditionalFunctions.set(additionalFunctionValue, []);
+
+    // visit all additional roots before going into the additional functions;
+    // this ensures that those potentially stateful additional roots will get
+    // initially serialized with the right initial effects applied.
+    for (let additionalRoot of additionalRoots) this.serializeValue(additionalRoot);
+
     let createdObjects = effects.createdObjects;
     let nestedFunctions = new Set([...createdObjects].filter(object => object instanceof FunctionValue));
     // Allows us to emit function declarations etc. inside of this additional

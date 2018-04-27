@@ -148,7 +148,7 @@ export class ResidualHeapVisitor {
   reactElementEquivalenceSet: ReactElementSet;
   // Parents will always be a generator, optimized function value or "GLOBAL"
   generatorParents: Map<Generator, Generator | FunctionValue | "GLOBAL">;
-  createdObjects: Map<ObjectValue, void | Generator>;
+  createdObjects: Map<ObjectValue, Generator>;
 
   globalEnvironmentRecord: GlobalEnvironmentRecord;
 
@@ -186,19 +186,23 @@ export class ResidualHeapVisitor {
   // creation scope, ensuring that the value has the right creation / life time.
   _registerAdditionalRoot(value: ObjectValue) {
     let generator = this.createdObjects.get(value);
+    let additionalFunction = this._getAdditionalFunctionOfScope() || "GLOBAL";
     if (generator !== undefined) {
       let s = generator;
       while (s instanceof Generator) {
         s = this.generatorParents.get(s);
       }
       invariant(s === "GLOBAL" || s instanceof FunctionValue);
-      let additionalFunction = this._getAdditionalFunctionOfScope();
       if (additionalFunction === s) return;
     } else {
-      let additionalFunction = this._getAdditionalFunctionOfScope();
-      if (additionalFunction === undefined) return;
+      if (additionalFunction === "GLOBAL") return;
       generator = this.globalGenerator;
     }
+
+    invariant(additionalFunction instanceof FunctionValue);
+    let additionalFVEffects = this.additionalFunctionValuesAndEffects.get(additionalFunction);
+    invariant(additionalFVEffects !== undefined);
+    additionalFVEffects.additionalRoots.add(value);
 
     this._visitInUnrelatedScope(generator, value);
   }
